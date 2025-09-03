@@ -1,4 +1,4 @@
-import { Room } from '../components/RoomCard';
+import { Room } from '../components/Rooms/RoomCard';
 
 export const generateRoomData = (): Room[] => {
   const rooms: Room[] = [];

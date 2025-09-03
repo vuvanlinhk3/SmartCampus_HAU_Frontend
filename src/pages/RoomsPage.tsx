@@ -65,12 +65,13 @@ export default function RoomsPage(): JSX.Element {
   };
 
   return (
-    <div className="p-6">
+    <div>
       {/* Building Overview */}
       <BuildingOverview stats={overallStats} />
 
       {/* Filter Bar */}
-      <FilterBar
+      <div className="p-6">
+        <FilterBar
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         selectedFloor={selectedFloor}
@@ -99,6 +100,8 @@ export default function RoomsPage(): JSX.Element {
           </div>
         )}
       </div>
+      </div>
+      
     </div>
   );
 }
