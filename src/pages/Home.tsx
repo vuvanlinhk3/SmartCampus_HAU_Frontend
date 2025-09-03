@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import Button from '../components/Button';
+import Sidebar from '../components/Rooms/Sidebar';
+import Header from '../components/Rooms/Header';
+import { useCurrentTime } from '../hooks/useCurrentTime';
+import RoomsPage from './RoomsPage';
+import DeviceManagementPage from './DeviceManagementPage';
 
 export default function Home(): JSX.Element {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('rooms');
+  const currentTime = useCurrentTime();
 
   const handleLogout = (): void => {
     navigate('/login');
@@ -12,17 +18,20 @@ export default function Home(): JSX.Element {
 
   return (
     <MainLayout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Chào mừng đến với hệ thống
-          </h1>
-          <p className="text-gray-600 mb-8">
-            Bạn đã đăng nhập thành công vào hệ thống của trường.
-          </p>
-          <Button onClick={handleLogout} variant="secondary">
-            Đăng xuất
-          </Button>
+      <div className="min-h-screen bg-gray-50 flex">
+        {/* Sidebar */}
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col ml-64">
+          {/* Header */}
+          <Header currentTime={currentTime} />
+
+          {/* Main Content Area */}
+          <main className="flex-1 overflow-auto">
+            {activeTab === 'rooms' && <RoomsPage />}
+            {activeTab === 'equipment' && <DeviceManagementPage />}
+          </main>
         </div>
       </div>
     </MainLayout>

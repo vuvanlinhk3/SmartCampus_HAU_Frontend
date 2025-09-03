@@ -11,6 +11,7 @@ export default function AppRoutes(): JSX.Element {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password/step1" element={<Step1Email />} />
         <Route path="/forgot-password/step2" element={<Step2Code />} />
