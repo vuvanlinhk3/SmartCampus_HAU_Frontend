@@ -1,6 +1,6 @@
 import React from 'react';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import Header from '../components/components/Header';
+// import Footer from '../components/Footer';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -13,7 +13,6 @@ export default function MainLayout({ children }: MainLayoutProps): JSX.Element {
       <main className="flex-1">
         {children}
       </main>
-      <Footer />
     </div>
   );
 }

@@ -1,13 +1,13 @@
+// src/components/RoomCard.tsx
 import React from 'react';
-import { Users, Clock, Monitor, PenTool, BookOpen, Briefcase } from 'lucide-react';
-
+import { Clock, Monitor, PenTool, BookOpen, Briefcase,Factory } from 'lucide-react';
+import { Link } from 'react-router-dom';
 export interface Room {
   id: string;
   floor: number;
   number: string;
   status: 'empty' | 'occupied' | 'maintenance';
-  capacity: number;
-  type: 'computer' | 'drawing' | 'theory' | 'office';
+  type: 'computer' | 'drawing' | 'theory' | 'office' | 'workshop' |'faculty';
   schedule?: {
     subject: string;
     instructor: string;
@@ -24,6 +24,8 @@ const roomTypeInfo = {
   drawing: { label: 'Phòng vẽ', icon: PenTool, color: 'text-purple-600' },
   theory: { label: 'Phòng lý thuyết', icon: BookOpen, color: 'text-green-600' },
   office: { label: 'Văn phòng khoa', icon: Briefcase, color: 'text-gray-600' },
+  faculty: { label: 'Văn phòng', icon: Briefcase, color: 'text-indigo-600' },
+  workshop: { label: 'Xưởng', icon: Factory, color: 'text-orange-600' },
 };
 
 const statusColors = {
@@ -49,6 +51,7 @@ export default function RoomCard({ room }: RoomCardProps) {
   const TypeIcon = typeInfo.icon;
 
   return (
+    <Link className ={`grid  auto-rows-fr`} to={`/room/${room.number}`}> {/* Thêm Link */}
     <div className={`rounded-lg p-3 transition-all hover:shadow-md ${statusColors[room.status]} min-h-[140px]`}>
       {/* Room Header */}
       <div className="flex items-center justify-between mb-2">
@@ -77,12 +80,7 @@ export default function RoomCard({ room }: RoomCardProps) {
           </div>
         </div>
       )}
-
-      {/* Capacity */}
-      <div className="flex items-center space-x-2 text-xs text-gray-600">
-        <Users className="w-4 h-4" />
-        <span>Sức chứa: {room.capacity}</span>
-      </div>
     </div>
+    </Link>
   );
 }

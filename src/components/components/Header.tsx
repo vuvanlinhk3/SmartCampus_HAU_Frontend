@@ -1,5 +1,5 @@
 import React from 'react';
-import { UNIVERSITY_NAME } from '../utils/constants';
+import { UNIVERSITY_NAME } from '../../utils/constants';
 
 export default function Header(): JSX.Element {
   return (

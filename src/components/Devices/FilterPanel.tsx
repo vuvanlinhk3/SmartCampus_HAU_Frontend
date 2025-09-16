@@ -1,6 +1,7 @@
+// src/components/Devices/FilterPanel.tsx
 import React from 'react';
 import { Search, MapPin, Building, Zap, Activity } from 'lucide-react';
-import { DeviceType, DeviceStatus } from '../types/device';
+import { DeviceType, DeviceStatus } from '../../types/index';
 
 interface FilterPanelProps {
   searchTerm: string;
@@ -33,11 +34,18 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 }) => {
   const deviceTypes = [
     { value: 'all' as DeviceType, label: 'Tất cả thiết bị' },
-    { value: 'light' as DeviceType, label: 'Đèn chiếu sáng' },
-    { value: 'ac' as DeviceType, label: 'Máy lạnh' },
+    { value: 'Bóng đèn' as DeviceType, label: 'Đèn chiếu sáng' },
+    { 
+    label: 'Máy lạnh',
+    options: [
+      { value: 'Điều hòa 1' as DeviceType, label: 'Điều hòa 1' },
+      { value: 'Điều hòa 2' as DeviceType, label: 'Điều hòa 2' },
+      { value: 'Điều hòa 3' as DeviceType, label: 'Điều hòa 3' },
+    ]
+  },
     { value: 'camera' as DeviceType, label: 'Camera giám sát' },
     { value: 'sensor' as DeviceType, label: 'Cảm biến' },
-    { value: 'projector' as DeviceType, label: 'Máy chiếu' },
+    { value: 'Máy Chiếu' as DeviceType, label: 'Máy chiếu' },
     { value: 'speaker' as DeviceType, label: 'Loa thông báo' },
   ];
 
@@ -72,7 +80,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
             onChange={(e) => onFloorChange(e.target.value ? Number(e.target.value) : null)}
             className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
           >
-            <option value="">Chọn tầng</option>
+            <option value="">Tất cả tầng</option>
             {floors.map((floor) => (
               <option key={floor} value={floor}>
                 {floor === 0 ? 'Tầng trệt' : `Tầng ${floor}`}
@@ -90,7 +98,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
             className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
             disabled={!selectedFloor && selectedFloor !== 0}
           >
-            <option value="">Chọn phòng</option>
+            <option value="">Tất cả phòng</option>
             {availableRooms.map((room) => (
               <option key={room} value={room}>
                 {room}

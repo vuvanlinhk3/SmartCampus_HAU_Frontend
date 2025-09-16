@@ -1,23 +1,49 @@
+// AppRoutes.tsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from '../contexts/AuthContext';
 import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Step1Email from '../pages/ForgotPassword/Step1Email';
-import Step2Code from '../pages/ForgotPassword/Step2Code';
-import Step3Reset from '../pages/ForgotPassword/Step3Reset';
+import ResetPassword from '../pages/ResetPassword';
+import RoomDetailPage from '../pages/RoomDetailsPage'; // Thêm import
+import ProtectedRoute from '../components/ProtectedRoute';
+import PublicRoute from '../components/PublicRoute';
 
 export default function AppRoutes(): JSX.Element {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password/step1" element={<Step1Email />} />
-        <Route path="/forgot-password/step2" element={<Step2Code />} />
-        <Route path="/forgot-password/step3" element={<Step3Reset />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          } />
+          <Route path="/login" element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          } />
+          <Route path="/forgot-password/step1" element={
+            <PublicRoute>
+              <Step1Email />
+            </PublicRoute>
+          } />
+          <Route path="/reset-password" element={
+            <PublicRoute>
+              <ResetPassword />
+            </PublicRoute>
+          } />
+          {/* Thêm route cho trang chi tiết phòng */}
+          <Route path="/room/:roomName" element={
+            <ProtectedRoute>
+              <RoomDetailPage />
+            </ProtectedRoute>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }

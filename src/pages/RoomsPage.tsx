@@ -1,16 +1,33 @@
-import React, { useState, useMemo } from 'react';
+// src/pages/RoomsPage.tsx
+import React, { useState, useMemo, useEffect } from 'react';
 import BuildingOverview from '../components/Rooms/BuildingOverview';
 import FilterBar from '../components/Rooms/FilterBar';
 import FloorSection from '../components/Rooms/FloorSection';
-import { generateRoomData } from '../data/roomData';
+import { getAllRooms } from '../utils/roomApi';
 import { Room } from '../components/Rooms/RoomCard';
 
 export default function RoomsPage(): JSX.Element {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFloor, setSelectedFloor] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [allRooms, setAllRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const allRooms = useMemo(() => generateRoomData(), []);
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const data = await getAllRooms();
+        setAllRooms(data.floors.flatMap(floor => floor.rooms));
+      } catch (err) {
+        setError('Không thể tải dữ liệu phòng. Vui lòng kiểm tra kết nối hoặc khởi động server.');
+        console.error('Failed to fetch rooms:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRooms();
+  }, []);
 
   // Filter rooms based on search criteria
   const filteredRooms = useMemo(() => {
@@ -37,7 +54,7 @@ export default function RoomsPage(): JSX.Element {
     }, { empty: 0, occupied: 0, maintenance: 0 });
 
     const total = stats.empty + stats.occupied + stats.maintenance;
-    const utilizationRate = Math.round((stats.occupied / total) * 100);
+    const utilizationRate = total > 0 ? Math.round((stats.occupied / total) * 100) : 0;
 
     return { ...stats, utilizationRate };
   }, [allRooms]);
@@ -64,6 +81,14 @@ export default function RoomsPage(): JSX.Element {
     }, { empty: 0, occupied: 0, maintenance: 0 });
   };
 
+  if (loading) {
+    return <div className="text-center py-12 bg-white rounded-lg"><p className="text-gray-500 text-lg">Đang tải dữ liệu...</p></div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-12 bg-white rounded-lg"><p className="text-red-500 text-lg">{error}</p></div>;
+  }
+
   return (
     <div>
       {/* Building Overview */}
@@ -72,36 +97,35 @@ export default function RoomsPage(): JSX.Element {
       {/* Filter Bar */}
       <div className="p-6">
         <FilterBar
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        selectedFloor={selectedFloor}
-        setSelectedFloor={setSelectedFloor}
-        selectedStatus={selectedStatus}
-        setSelectedStatus={setSelectedStatus}
-      />
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          selectedFloor={selectedFloor}
+          setSelectedFloor={setSelectedFloor}
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
+        />
 
-      {/* Room Sections by Floor */}
-      <div className="space-y-6">
-        {Object.keys(roomsByFloor)
-          .map(Number)
-          .sort((a, b) => a - b)
-          .map(floor => (
-            <FloorSection
-              key={floor}
-              floor={floor}
-              rooms={roomsByFloor[floor]}
-              stats={getFloorStats(roomsByFloor[floor])}
-            />
-          ))}
-        
-        {Object.keys(roomsByFloor).length === 0 && (
-          <div className="text-center py-12 bg-white rounded-lg">
-            <p className="text-gray-500 text-lg">Không tìm thấy phòng nào phù hợp với tiêu chí tìm kiếm.</p>
-          </div>
-        )}
+        {/* Room Sections by Floor */}
+        <div className="space-y-6">
+          {Object.keys(roomsByFloor)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .map(floor => (
+              <FloorSection
+                key={floor}
+                floor={floor}
+                rooms={roomsByFloor[floor]}
+                stats={getFloorStats(roomsByFloor[floor])}
+              />
+            ))}
+          
+          {Object.keys(roomsByFloor).length === 0 && (
+            <div className="text-center py-12 bg-white rounded-lg">
+              <p className="text-gray-500 text-lg">Không tìm thấy phòng nào phù hợp với tiêu chí tìm kiếm.</p>
+            </div>
+          )}
+        </div>
       </div>
-      </div>
-      
     </div>
   );
 }

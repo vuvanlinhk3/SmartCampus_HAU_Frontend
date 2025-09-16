@@ -6,6 +6,9 @@ import Header from '../components/Rooms/Header';
 import { useCurrentTime } from '../hooks/useCurrentTime';
 import RoomsPage from './RoomsPage';
 import DeviceManagementPage from './DeviceManagementPage';
+import FloorPlanPage from './FloorPlanPage';
+import StatisticsPage from './StatisticsPage';
+import Setting from './SettingsPage';
 
 export default function Home(): JSX.Element {
   const navigate = useNavigate();
@@ -28,9 +31,12 @@ export default function Home(): JSX.Element {
           <Header currentTime={currentTime} />
 
           {/* Main Content Area */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex flex-col h-screen">
             {activeTab === 'rooms' && <RoomsPage />}
             {activeTab === 'equipment' && <DeviceManagementPage />}
+            {activeTab === 'floor-plan' && <FloorPlanPage />}
+            {activeTab === 'statistics' && <StatisticsPage/>}
+            {activeTab === 'setting' && <Setting/>}
           </main>
         </div>
       </div>

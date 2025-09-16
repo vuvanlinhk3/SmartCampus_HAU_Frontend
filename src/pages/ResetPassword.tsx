@@ -1,43 +1,79 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, Eye, EyeOff, Check, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import AuthLayout from '../../layouts/AuthLayout';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { apiClient } from '../utils/api';
+import AuthLayout from '../layouts/AuthLayout';
+import Card from '../components/components/Card';
+import Button from '../components/components/Button';
 
-export default function Step3Reset(): JSX.Element {
+export default function ResetPassword(): JSX.Element {
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Check if user came from previous steps
-    const storedEmail = sessionStorage.getItem('resetEmail');
-    if (!storedEmail) {
-      navigate('/forgot-password/step1');
-    }
-  }, [navigate]);
+  const email = searchParams.get('email');
+  const token = searchParams.get('token');
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+  useEffect(() => {
+    // Check if required parameters are present
+    if (!email || !token) {
+      setError('Link không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu link mới.');
+    }
+  }, [email, token]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (newPassword === confirmPassword && newPassword.length >= 6) {
-      // Clear stored email
-      sessionStorage.removeItem('resetEmail');
-      // Navigate back to login
-      navigate('/login');
+    
+    if (!email || !token) {
+      setError('Link không hợp lệ hoặc đã hết hạn.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await apiClient.resetPassword({
+        Email: email,
+        Token: token,
+        NewPassword: newPassword,
+      });
+
+      if (response.success) {
+        setSuccess('Đổi mật khẩu thành công!');
+        setTimeout(() => {
+          navigate('/login', { 
+            state: { message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' }
+          });
+        }, 2000);
+      } else {
+        setError(response.message || 'Không thể đổi mật khẩu. Link có thể đã hết hạn.');
+      }
+    } catch (error) {
+      setError('Lỗi kết nối. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleBackToLogin = (): void => {
-    sessionStorage.removeItem('resetEmail');
     navigate('/login');
   };
 
   const isPasswordValid = newPassword.length >= 6;
   const doPasswordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
-  const isFormValid = isPasswordValid && doPasswordsMatch;
+  const isFormValid = isPasswordValid && doPasswordsMatch && email && token;
 
   return (
     <AuthLayout>
@@ -52,15 +88,32 @@ export default function Step3Reset(): JSX.Element {
         {/* Title */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Đổi mật khẩu mới
+            Đặt lại mật khẩu
           </h2>
           <p className="text-gray-600 text-sm">
-            Tạo mật khẩu mới để bảo mật tài khoản
+            Tạo mật khẩu mới cho tài khoản của bạn
           </p>
+          {email && (
+            <p className="text-[#005DAA] text-sm font-medium mt-1">
+              {email}
+            </p>
+          )}
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-3">
+              <p className="text-green-600 text-sm">{success}</p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Mật khẩu mới
@@ -72,12 +125,14 @@ export default function Step3Reset(): JSX.Element {
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#005DAA] focus:border-[#005DAA] outline-none transition-colors"
                 placeholder="Nhập mật khẩu mới"
+                disabled={isLoading || success !== ''}
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowNewPassword(!showNewPassword)}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={isLoading || success !== ''}
               >
                 {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -105,12 +160,14 @@ export default function Step3Reset(): JSX.Element {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#005DAA] focus:border-[#005DAA] outline-none transition-colors"
                 placeholder="Nhập lại mật khẩu"
+                disabled={isLoading || success !== ''}
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={isLoading || success !== ''}
               >
                 {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -129,10 +186,10 @@ export default function Step3Reset(): JSX.Element {
 
           <Button 
             type="submit" 
-            disabled={!isFormValid}
+            disabled={!isFormValid || isLoading || success !== ''}
             className="w-full"
           >
-            Đổi mật khẩu
+            {isLoading ? 'Đang đặt lại mật khẩu...' : 'Đặt lại mật khẩu'}
           </Button>
         </form>
 

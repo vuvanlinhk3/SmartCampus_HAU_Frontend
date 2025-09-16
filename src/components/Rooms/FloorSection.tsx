@@ -1,3 +1,4 @@
+// src/components/FloorSection.tsx
 import React from 'react';
 import RoomCard, { Room } from './RoomCard';
 

@@ -1,14 +1,7 @@
+// src/components/Devices/DeviceCard.tsx
 import React from 'react';
-import { 
-  Lightbulb, 
-  Thermometer, 
-  Camera, 
-  Gauge, 
-  Projector, 
-  Volume2,
-  Settings
-} from 'lucide-react';
-import { Device } from '../types/device';
+import { Lightbulb, Thermometer, Camera, Gauge, Projector, Volume2, Settings } from 'lucide-react';
+import { Device } from '../../types/index';
 
 interface DeviceCardProps {
   device: Device;
@@ -19,15 +12,27 @@ interface DeviceCardProps {
 export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onViewDetails }) => {
   const getDeviceIcon = (type: string) => {
     switch (type) {
-      case 'light':
+      case 'Bóng đèn':
         return <Lightbulb className="w-6 h-6" />;
-      case 'ac':
+      case 'Điều hòa 1':
+      case 'Điều hòa':
+        return <Thermometer className="w-6 h-6" />;
+      case 'Điều hòa 2':
+        return <Thermometer className="w-6 h-6" />;
+      case 'Điều hòa 3':
+        return <Thermometer className="w-6 h-6" />;
+      case 'Điều hòa 4':
         return <Thermometer className="w-6 h-6" />;
       case 'camera':
         return <Camera className="w-6 h-6" />;
-      case 'sensor':
+      case 'Cảm Biến':
+        return <Gauge className="w-6 h-6" />;
+      case 'Nhiệt độ':
         return <Gauge className="w-6 h-6" />;
       case 'projector':
+      case 'Máy chiếu':
+      case 'Máy Chiếu':
+      case 'Ti Vi':
         return <Projector className="w-6 h-6" />;
       case 'speaker':
         return <Volume2 className="w-6 h-6" />;
@@ -38,69 +43,75 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onView
 
   const getDeviceTypeName = (type: string) => {
     switch (type) {
-      case 'light':
-        return 'Thang máy';
-      case 'ac':
-        return 'Máy chiếu';
+      case 'Bóng đèn':
+        return 'Đèn chiếu sáng';
+      case 'Điều hòa':
+        return 'Máy lạnh';
+      case 'Điều hòa 1':
+        return 'Máy lạnh';
+      case 'Điều hòa 2':
+        return 'Máy lạnh';
+      case 'Điều hòa 3':
+        return 'Máy lạnh';
       case 'camera':
-        return 'Camera';
+        return 'Camera giám sát';
       case 'sensor':
         return 'Cảm biến';
-      case 'projector':
+      case 'Máy Chiếu':
+        return 'Máy chiếu';
+      case 'Ti Vi':
         return 'Máy chiếu';
       case 'speaker':
-        return 'Loa';
+        return 'Loa thông báo';
       default:
         return 'Thiết bị';
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            Hoạt động
-          </span>
-        );
-      case 'inactive':
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-            Tắt
-          </span>
-        );
-      case 'error':
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-            Lỗi
-          </span>
-        );
-      case 'maintenance':
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-            Bảo trì
-          </span>
-        );
-      default:
-        return null;
+  const getStatusBadge = (device: Device) => {
+    if (device.status === 'maintenance') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+          Bảo trì
+        </span>
+      );
     }
+    
+    // For non-maintenance devices, show operational status
+    if (device.lastData === 'Đang hoạt động') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          Hoạt động
+        </span>
+      );
+    } else if (device.lastData === 'Tắt') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          Tắt
+        </span>
+      );
+    }
+    
+    return null;
   };
 
-  const getToggleButton = (status: string) => {
-    const canToggle = status !== 'error' && status !== 'maintenance';
+  const getToggleButton = (device: Device) => {
+    // Check if device is in maintenance mode based on the API status
+    const isInMaintenance = device.status === 'maintenance';
     
-    if (!canToggle) {
+    if (isInMaintenance) {
       return (
         <button
           disabled
           className="px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-400 cursor-not-allowed"
         >
-          Tắt
+          Đang bảo trì
         </button>
       );
     }
 
-    if (status === 'active') {
+    // For non-maintenance devices, show toggle button based on operational status
+    if (device.lastData === 'Đang hoạt động') {
       return (
         <button
           onClick={() => onToggle(device.id)}
@@ -126,12 +137,15 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onView
       {/* Header with Icon and Status */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-2">
-          <div className={`p-2 rounded-lg ${
-            device.status === 'active' ? 'bg-green-100 text-green-600' : 
-            device.status === 'error' ? 'bg-red-100 text-red-600' :
-            device.status === 'maintenance' ? 'bg-orange-100 text-orange-600' :
-            'bg-gray-100 text-gray-600'
-          }`}>
+          <div
+            className={`p-2 rounded-lg ${
+              device.status === 'maintenance'
+                ? 'bg-orange-100 text-orange-600'
+                : device.lastData === 'Đang hoạt động'
+                ? 'bg-green-100 text-green-600'
+                : 'bg-gray-100 text-gray-600'
+            }`}
+          >
             {getDeviceIcon(device.type)}
           </div>
           <div>
@@ -139,12 +153,12 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onView
             <p className="text-xs text-gray-500">{getDeviceTypeName(device.type)}</p>
           </div>
         </div>
-        {getStatusBadge(device.status)}
+        {getStatusBadge(device)}
       </div>
 
       {/* Device Info */}
       <div className="mb-3">
-        <p className="text-xs text-gray-600 mb-1">cập nhật 1 phút trước</p>
+        <p className="text-xs text-gray-600 mb-1">Cập nhật 1 phút trước</p>
         {device.temperature && (
           <p className="text-sm font-medium text-gray-900">{device.temperature}°C</p>
         )}
@@ -161,7 +175,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onView
         >
           Chi tiết
         </button>
-        {getToggleButton(device.status)}
+        {getToggleButton(device)}
       </div>
     </div>
   );

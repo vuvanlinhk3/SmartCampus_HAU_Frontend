@@ -1,13 +1,14 @@
+// src/components/Devices/DeviceDetailModal.tsx
 import React, { useState } from 'react';
 import { X, Calendar, User, CheckCircle, Clock, Power } from 'lucide-react';
-import { Device, MaintenanceRecord, DeviceStatus } from '../types/device';
+import { Device, MaintenanceRecord, DeviceStatus } from '../../types/index';
 
 interface DeviceDetailModalProps {
   device: Device;
   isOpen: boolean;
   onClose: () => void;
   onMarkForMaintenance: (deviceId: string, note: string) => void;
-  onToggleDevice: (deviceId: string, status: 'active' | 'inactive') => void;
+  onToggleDevice: (deviceId: string) => void;
   onUpdateStatus: (deviceId: string, status: DeviceStatus) => void;
 }
 
@@ -24,11 +25,6 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<DeviceStatus>(device.status);
 
   if (!isOpen) return null;
-
-  const handleToggleDevice = () => {
-    const newStatus = device.status === 'active' ? 'inactive' : 'active';
-    onToggleDevice(device.id, newStatus);
-  };
 
   const handleUpdateMaintenance = () => {
     if (maintenanceNote.trim()) {
@@ -56,9 +52,9 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
   const getStatusText = (status: DeviceStatus) => {
     switch (status) {
       case 'active':
-        return 'Hoạt động';
+        return 'Đang hoạt động';
       case 'inactive':
-        return 'Ngừng hoạt động';
+        return 'Đang tắt';
       case 'error':
         return 'Lỗi';
       case 'maintenance':
@@ -148,17 +144,12 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Mã thiết bị:</span>
-                      <span className="text-sm font-medium text-gray-900">{device.id}</span>
+                      <span className="text-sm font-medium text-gray-900">{device.code}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Loại thiết bị:</span>
                       <span className="text-sm font-medium text-gray-900 capitalize">
-                        {device.type === 'light' ? 'Đèn chiếu sáng' :
-                         device.type === 'ac' ? 'Máy lạnh' :
-                         device.type === 'camera' ? 'Camera giám sát' :
-                         device.type === 'sensor' ? 'Cảm biến' :
-                         device.type === 'projector' ? 'Máy chiếu' :
-                         device.type === 'speaker' ? 'Loa thông báo' : device.type}
+                        {getDeviceTypeName(device.type)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -169,12 +160,6 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
                       <span className="text-sm text-gray-600">Tầng:</span>
                       <span className="text-sm font-medium text-gray-900">
                         {device.floor === 0 ? 'Tầng trệt' : `Tầng ${device.floor}`}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Ngày lắp đặt:</span>
-                      <span className="text-sm font-medium text-gray-900">
-                        {new Date(device.installDate).toLocaleDateString('vi-VN')}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -192,30 +177,34 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
                     Thông số hiện tại
                   </h4>
                   <div className="space-y-3">
-                    {device.powerConsumption !== undefined && (
+                    {device.powerConsumption !== undefined && device.powerConsumption > 0 ? (
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Điện năng tiêu thụ:</span>
                         <span className="text-sm font-medium text-gray-900">{device.powerConsumption}W</span>
                       </div>
+                    ) : (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Điện năng tiêu thụ:</span>
+                        <span className="text-sm font-medium text-gray-900">Không có thông tin</span>
+                      </div>
                     )}
+                    
                     {device.lastData && (
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Cập nhật gần nhất:</span>
+                        <span className="text-sm text-gray-600">Trạng thái chi tiết:</span>
                         <span className="text-sm font-medium text-gray-900">
-                          {device.lastData === 'Tắt' || device.lastData === 'Đang chờ bảo trì'
-                            ? device.lastData
-                            : new Date(device.lastData).toLocaleString('vi-VN')}
+                          {device.lastData}
                         </span>
                       </div>
                     )}
                   </div>
                   <button
-                    onClick={handleToggleDevice}
+                    onClick={() => onToggleDevice(device.id)}
                     disabled={device.status === 'error' || device.status === 'maintenance'}
                     className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
                       device.status === 'active'
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-red-600 text-white hover:bg-red-700'
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-green-600 text-white hover:bg-green-700'
                     } ${device.status === 'error' || device.status === 'maintenance' ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <Power className="w-4 h-4 inline mr-2" />
@@ -241,8 +230,6 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
                         className="w-48 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                       >
                         <option value="active">Đang hoạt động</option>
-                        <option value="inactive">Ngừng hoạt động</option>
-                        <option value="error">Lỗi</option>
                         <option value="maintenance">Đang bảo trì</option>
                       </select>
                     </div>
@@ -264,7 +251,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
                 </div>
 
                 {/* Maintenance History */}
-                {device.maintenanceHistory.length > 0 && (
+                {device.maintenanceHistory && device.maintenanceHistory.length > 0 ? (
                   <div className="mt-6">
                     <h4 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">
                       Lịch sử bảo trì
@@ -294,6 +281,10 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
                       ))}
                     </div>
                   </div>
+                ) : (
+                  <div className="mt-6 text-center text-gray-500">
+                    Không có lịch sử bảo trì
+                  </div>
                 )}
               </div>
             )}
@@ -303,3 +294,32 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
     </div>
   );
 };
+
+function getDeviceTypeName(type: string) {
+  switch (type) {
+    case 'Bóng đèn':
+      return 'Đèn chiếu sáng';
+    case 'Điều hòa':
+      return 'Máy lạnh';
+    case 'Điều hòa 4':
+      return 'Máy lạnh';
+    case 'Điều hòa 1':
+      return 'Máy lạnh';
+    case 'Điều hòa 2':
+      return 'Máy lạnh';
+    case 'Điều hòa 3':
+      return 'Máy lạnh';
+    case 'camera':
+      return 'Camera giám sát';
+    case 'Cảm Biến':
+      return 'Cảm biến';
+    case 'Máy Chiếu':
+      return 'Máy chiếu';
+    case 'Ti Vi':
+      return 'Máy chiếu';
+    case 'speaker':
+      return 'Loa thông báo';
+    default:
+      return 'Thiết bị';
+  }
+}

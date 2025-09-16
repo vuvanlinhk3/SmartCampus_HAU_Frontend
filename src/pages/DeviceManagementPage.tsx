@@ -1,66 +1,179 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Clock } from 'lucide-react';
+// src/pages/DeviceManagementPage.tsx
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search } from 'lucide-react';
 import { DeviceCard } from '../components/Devices/DeviceCard';
 import { DeviceDetailModal } from '../components/Devices/DeviceDetailModal';
-import { Device, DeviceType, DeviceStatus } from '../types/device';
-import { mockDevices, floors, getRoomsByFloor } from '../data/mockDevices';
+import { Unit, RoomWithUnits, getAllRoomsWithUnits, updateUnit } from '../utils/apiUnits';
+import { Device, DeviceStatus } from '../types/index';
 
 function DeviceManagementPage() {
-  const [devices, setDevices] = useState<Device[]>(mockDevices);
+  const [rooms, setRooms] = useState<RoomWithUnits[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFloor, setSelectedFloor] = useState<string>('All');
   const [selectedRoom, setSelectedRoom] = useState<string>('All');
   const [selectedType, setSelectedType] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-  const handleUpdateStatus = (deviceId: string, status: DeviceStatus) => {
-    setDevices(prev => prev.map(device => {
-      if (device.id === deviceId) {
-        // Ensure we're only setting valid device statuses
-        const validStatus = status === 'all' ? 'inactive' : status;
-        return { ...device, status: validStatus };
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const roomsData = await getAllRoomsWithUnits();
+        setRooms(roomsData);
+        setError(null);
+      } catch (err) {
+        setError('Failed to fetch devices. Please try again later.');
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-      return device;
-    }));
+    };
+    fetchData();
+  }, []);
+
+  // Robust floor parser:
+  // - "Tầng trệt" -> 0
+  // - "Tầng 5" -> 5
+  // - "M301"  -> 3  (301 -> floor = 3)
+  // - "1001"  -> 10 (1001 -> floor = 10)
+  const parseFloorFromRoomName = (roomName: string): number => {
+    if (!roomName) return 0;
+    const lower = roomName.toLowerCase();
+    if (lower.includes('tầng trệt')) return 0;
+
+    // Direct "Tầng N" pattern
+    const floorMatch = roomName.match(/Tầng\s*(\d{1,2})/i);
+    if (floorMatch) {
+      const n = parseInt(floorMatch[1], 10);
+      if (!isNaN(n)) return n;
+    }
+
+    // Find first numeric sequence
+    const digitsMatch = roomName.match(/\d+/);
+    if (!digitsMatch) return 0;
+    const numStr = digitsMatch[0];
+
+    // If length >= 3, assume last two digits are room number, prefix is floor
+    // e.g. 301 -> '3', 1001 -> '10'
+    if (numStr.length >= 3) {
+      const floorStr = numStr.slice(0, numStr.length - 2);
+      const floorNum = parseInt(floorStr, 10);
+      if (!isNaN(floorNum)) return floorNum;
+    }
+
+    // fallback: use the whole number
+    const fallback = parseInt(numStr, 10);
+    return isNaN(fallback) ? 0 : fallback;
   };
 
-  // Filter devices based on criteria
+  // Map Unit to Device
+  const mapUnitToDevice = (unit: Unit, roomName: string): Device => {
+    const isInMaintenance = !unit.status;
+    return {
+      id: unit.unitId.toString(),
+      code: unit.deviceCode,
+      name: unit.deviceType,
+      type: unit.deviceType,
+      status: isInMaintenance ? 'maintenance' : 'active',
+      room: roomName,
+      floor: parseFloorFromRoomName(roomName),
+      lastData: unit.detail || (unit.status ? 'Đang hoạt động' : 'Đang bảo trì'),
+      powerConsumption: unit.status ? 100 : 0,
+      installDate: new Date().toISOString(),
+      maintenanceHistory: [],
+      activityLog: [],
+    };
+  };
+
+  // Convert list of rooms -> flat devices
+  const devices = useMemo(() => {
+    return rooms.flatMap(room => room.units.map(unit => mapUnitToDevice(unit, room.roomName)));
+  }, [rooms]);
+
+  // Floors available: unique numeric floors, sorted ascending.
+  // As requested: show floors from 3 to 20 (inclusive).
+  const floors = useMemo(() => {
+    const floorNumbers = rooms.map(r => parseFloorFromRoomName(r.roomName));
+    const unique = Array.from(new Set(floorNumbers));
+    const filtered = unique.filter(n => n >= 3 && n <= 20);
+    filtered.sort((a, b) => a - b);
+    return filtered; // array of numbers
+  }, [rooms]);
+
+  const handleUpdateStatus = async (deviceId: string, status: DeviceStatus) => {
+    try {
+      let unitToUpdate: Unit | null = null;
+      let roomId: number | null = null;
+
+      for (const room of rooms) {
+        const unit = room.units.find(u => u.unitId.toString() === deviceId);
+        if (unit) {
+          unitToUpdate = unit;
+          roomId = room.roomId;
+          break;
+        }
+      }
+
+      if (!unitToUpdate || roomId === null) return;
+
+      if (status === 'active' || status === 'maintenance') {
+        await updateUnit(unitToUpdate.unitId, {
+          unitId: unitToUpdate.unitId,
+          roomId: roomId,
+          deviceType: unitToUpdate.deviceType,
+          deviceCode: unitToUpdate.deviceCode,
+          status: status === 'active',
+          detail: status === 'active' ? 'Đang hoạt động' : 'Đang bảo trì'
+        });
+      }
+
+      setRooms(prev => prev.map(room => ({
+        ...room,
+        units: room.units.map(unit => {
+          if (unit.unitId.toString() === deviceId) {
+            return {
+              ...unit,
+              status: status === 'active',
+              detail: status === 'active' ? 'Đang hoạt động' : 'Đang bảo trì'
+            };
+          }
+          return unit;
+        }),
+      })));
+    } catch (error) {
+      console.error('Error updating device status:', error);
+      setError('Failed to update device status.');
+    }
+  };
+
+  // Filters
   const filteredDevices = useMemo(() => {
     return devices.filter((device) => {
-      // Search term filter
-      if (searchTerm && !device.name.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return false;
-      }
+      if (searchTerm && !device.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
 
-      // Floor filter
       if (selectedFloor !== 'All') {
         const floorNum = selectedFloor === 'Tầng trệt' ? 0 : parseInt(selectedFloor.replace('Tầng ', ''));
-        if (device.floor !== floorNum) {
-          return false;
-        }
+        if (device.floor !== floorNum) return false;
       }
 
-      // Room filter
-      if (selectedRoom !== 'All' && device.room !== selectedRoom) {
-        return false;
-      }
+      if (selectedRoom !== 'All' && device.room !== selectedRoom) return false;
 
-      // Type filter
       if (selectedType !== 'All') {
-        const typeMap: { [key: string]: string } = {
-          'Đèn chiếu sáng': 'light',
-          'Máy lạnh': 'ac',
-          'Camera giám sát': 'camera',
-          'Cảm biến': 'sensor',
-          'Máy chiếu': 'projector',
-          'Loa thông báo': 'speaker',
+        const typeMap: { [key: string]: string[] } = {
+          'Đèn chiếu sáng': ['Bóng đèn'],
+          'Máy lạnh': ['Điều hòa','Điều hòa 1', 'Điều hòa 2', 'Điều hòa 3', 'Điều hòa 4'],
+          'Camera giám sát': ['camera'],
+          'Cảm biến': ['Cảm biến'],
+          'Máy chiếu': ['Máy chiếu', 'Ti Vi'],
+          'Loa thông báo': ['speaker'],
         };
-        if (device.type !== typeMap[selectedType]) {
-          return false;
-        }
+        const allowedTypes = typeMap[selectedType] || [];
+        if (!allowedTypes.includes(device.type)) return false;
       }
 
-      // Status filter
       if (selectedStatus !== 'All') {
         const statusMap: { [key: string]: string } = {
           'Đang hoạt động': 'active',
@@ -68,108 +181,122 @@ function DeviceManagementPage() {
           'Lỗi': 'error',
           'Đang bảo trì': 'maintenance',
         };
-        if (device.status !== statusMap[selectedStatus]) {
-          return false;
-        }
+        if (device.status !== statusMap[selectedStatus]) return false;
       }
 
       return true;
     });
   }, [devices, searchTerm, selectedFloor, selectedRoom, selectedType, selectedStatus]);
 
-  // Group devices by floor and room
+  // Group devices by floorKey -> roomName -> devices
   const groupedDevices = useMemo(() => {
-    const groups: { [key: string]: { [key: string]: Device[] } } = {};
-    
-    filteredDevices.forEach((device) => {
+    const groups: { [floorKey: string]: { [roomName: string]: Device[] } } = {};
+    filteredDevices.forEach(device => {
       const floorKey = device.floor === 0 ? 'Tầng trệt' : `Tầng ${device.floor}`;
-      if (!groups[floorKey]) {
-        groups[floorKey] = {};
-      }
-      if (!groups[floorKey][device.room]) {
-        groups[floorKey][device.room] = [];
-      }
+      if (!groups[floorKey]) groups[floorKey] = {};
+      if (!groups[floorKey][device.room]) groups[floorKey][device.room] = [];
       groups[floorKey][device.room].push(device);
     });
-    
     return groups;
   }, [filteredDevices]);
 
+  // Create ordered entries of groupedDevices sorted by numeric floor asc, and restrict to floors 3..20
+  const orderedGroupEntries = useMemo(() => {
+    const entries = Object.entries(groupedDevices);
+    entries.sort((a, b) => {
+      const fa = a[0] === 'Tầng trệt' ? 0 : parseInt(a[0].replace('Tầng ', ''), 10) || 0;
+      const fb = b[0] === 'Tầng trệt' ? 0 : parseInt(b[0].replace('Tầng ', ''), 10) || 0;
+      return fa - fb;
+    });
+    // keep only floors 3..20
+    return entries.filter(([floorKey]) => {
+      const num = floorKey === 'Tầng trệt' ? 0 : parseInt(floorKey.replace('Tầng ', ''), 10) || 0;
+      return num >= 3 && num <= 20;
+    });
+  }, [groupedDevices]);
+
   const handleToggleDevice = (deviceId: string) => {
-    setDevices(prev => prev.map(device => {
-      if (device.id === deviceId) {
-        const newStatus = device.status === 'active' ? 'inactive' : 'active';
-        return {
-          ...device,
-          status: newStatus,
-          lastData: newStatus === 'active' ? device.lastData || 'Đang hoạt động' : 'Tắt',
-          powerConsumption: newStatus === 'active' ? device.powerConsumption : 0,
-        };
-      }
-      return device;
-    }));
+    setRooms(prev => prev.map(room => ({
+      ...room,
+      units: room.units.map(unit => {
+        if (unit.unitId.toString() === deviceId) {
+          if (!unit.status) return unit; // don't toggle if in maintenance
+          const isCurrentlyOn = unit.detail === 'Đang hoạt động';
+          return { ...unit, detail: isCurrentlyOn ? 'Tắt' : 'Đang hoạt động' };
+        }
+        return unit;
+      }),
+    })));
   };
 
-  const handleMarkForMaintenance = (deviceId: string, note: string) => {
-    setDevices(prev => prev.map(device => {
-      if (device.id === deviceId) {
-        const newMaintenanceRecord = {
-          id: `maintenance-${Date.now()}`,
-          date: new Date().toISOString().split('T')[0],
-          type: 'repair' as const,
-          technician: 'Đang phân công',
-          description: note,
-          status: 'scheduled' as const,
-        };
-
-        const newActivityLog = {
-          id: `activity-${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          action: 'Đánh dấu cần bảo trì',
-          user: 'Quản trị viên',
-          details: note,
-        };
-
-        return {
-          ...device,
-          status: 'maintenance' as const,
-          lastData: 'Đang chờ bảo trì',
-          maintenanceHistory: [newMaintenanceRecord, ...device.maintenanceHistory],
-          activityLog: [newActivityLog, ...device.activityLog],
-        };
+  const handleMarkForMaintenance = async (deviceId: string, note: string) => {
+    try {
+      let unitToUpdate: Unit | null = null;
+      let roomId: number | null = null;
+      for (const room of rooms) {
+        const unit = room.units.find(u => u.unitId.toString() === deviceId);
+        if (unit) {
+          unitToUpdate = unit;
+          roomId = room.roomId;
+          break;
+        }
       }
-      return device;
-    }));
+      if (!unitToUpdate || roomId === null) return;
+
+      await updateUnit(unitToUpdate.unitId, {
+        unitId: unitToUpdate.unitId,
+        roomId,
+        deviceType: unitToUpdate.deviceType,
+        deviceCode: unitToUpdate.deviceCode,
+        status: false,
+        detail: note || 'Đang bảo trì'
+      });
+
+      setRooms(prev => prev.map(room => ({
+        ...room,
+        units: room.units.map(unit => {
+          if (unit.unitId.toString() === deviceId) {
+            return { ...unit, status: false, detail: note || 'Đang bảo trì' };
+          }
+          return unit;
+        }),
+      })));
+    } catch (error) {
+      console.error('Error marking device for maintenance:', error);
+      setError('Failed to mark device for maintenance.');
+    }
   };
 
-  // Get available rooms based on selected floor
   const availableRooms = useMemo(() => {
     if (selectedFloor === 'All') {
-      const allRooms = devices.map(device => device.room);
+      const allRooms = rooms.map(room => room.roomName);
       return [...new Set(allRooms)].sort();
     }
     const floorNum = selectedFloor === 'Tầng trệt' ? 0 : parseInt(selectedFloor.replace('Tầng ', ''));
-    return getRoomsByFloor(floorNum);
-  }, [selectedFloor, devices]);
+    return rooms
+      .filter(room => parseFloorFromRoomName(room.roomName) === floorNum)
+      .map(room => room.roomName)
+      .sort();
+  }, [selectedFloor, rooms]);
+
+  if (loading) return <div className="text-center py-12">Đang tải dữ liệu...</div>;
+  if (error) return <div className="text-center py-12 text-red-600">{error}</div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-400 to-blue-500 text-white">
         <div className="mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold">Quản lý thiết bị</h1>
-              <p className="text-blue-100 text-sm">Tòa M - HAU</p>
+              <p className="text-blue-100 mt-1">Tòa M - HAU</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="mx-auto px-6 py-3">
-        {/* Search and Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          {/* Search */}
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -181,23 +308,20 @@ function DeviceManagementPage() {
             />
           </div>
 
-          {/* Filter Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Chọn tầng:</label>
               <select
                 value={selectedFloor}
-                onChange={(e) => {
-                  setSelectedFloor(e.target.value);
-                  setSelectedRoom('All');
-                }}
+                onChange={(e) => { setSelectedFloor(e.target.value); setSelectedRoom('All'); }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="All">All</option>
-                <option value="Tầng trệt">Tầng trệt</option>
-                <option value="Tầng 1">Tầng 1</option>
-                <option value="Tầng 2">Tầng 2</option>
-                <option value="Tầng 3">Tầng 3</option>
+                <option value="All">Tất cả</option>
+                {floors.map(floor => (
+                  <option key={floor} value={floor === 0 ? 'Tầng trệt' : `Tầng ${floor}`}>
+                    {floor === 0 ? 'Tầng trệt' : `Tầng ${floor}`}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -208,7 +332,7 @@ function DeviceManagementPage() {
                 onChange={(e) => setSelectedRoom(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="All">All</option>
+                <option value="All">Tất cả</option>
                 {availableRooms.map((room) => (
                   <option key={room} value={room}>{room}</option>
                 ))}
@@ -222,7 +346,7 @@ function DeviceManagementPage() {
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="All">All</option>
+                <option value="All">Tất cả</option>
                 <option value="Đèn chiếu sáng">Đèn chiếu sáng</option>
                 <option value="Máy lạnh">Máy lạnh</option>
                 <option value="Camera giám sát">Camera giám sát</option>
@@ -239,18 +363,16 @@ function DeviceManagementPage() {
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="All">All</option>
+                <option value="All">Tất cả</option>
                 <option value="Đang hoạt động">Đang hoạt động</option>
                 <option value="Đang tắt">Đang tắt</option>
-                <option value="Lỗi">Lỗi</option>
                 <option value="Đang bảo trì">Đang bảo trì</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Device Groups */}
-        {Object.keys(groupedDevices).length === 0 ? (
+        {orderedGroupEntries.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
               <Search className="w-16 h-16 mx-auto" />
@@ -260,42 +382,30 @@ function DeviceManagementPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {Object.entries(groupedDevices).map(([floor, rooms]) => (
+            {orderedGroupEntries.map(([floor, roomsByName]) => (
               <div key={floor}>
-                {/* Floor Header */}
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Thiết bị hành lang {floor.toLowerCase()}
-                  </h2>
-                  <span className="text-sm text-gray-500">
-                    {Object.values(rooms).flat().length} thiết bị
-                  </span>
+                  <h2 className="text-lg font-semibold text-gray-900">Tổng Thiết bị</h2>
+                  <span className="text-sm text-gray-500">{Object.values(roomsByName).flat().length} thiết bị</span>
                 </div>
 
-                {/* Rooms in Floor */}
-                {Object.entries(rooms).map(([room, roomDevices]) => (
-                  <div key={`${floor}-${room}`} className="mb-8">
-                    {/* Room Header */}
+                {Object.entries(roomsByName).map(([roomName, roomDevices]) => (
+                  <div key={`${floor}-${roomName}`} className="mb-8">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-base font-medium text-gray-800 bg-gray-100 px-3 py-1 rounded-lg">
-                        {room}
-                      </h3>
+                      <h3 className="text-base font-medium text-gray-800 bg-gray-100 px-3 py-1 rounded-lg">{roomName}</h3>
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-500">{roomDevices.length} thiết bị</span>
-                        <button className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded">
-                          Xem chi tiết phòng
-                        </button>
+                        <button className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded">Xem chi tiết phòng</button>
                       </div>
                     </div>
 
-                    {/* Device Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {roomDevices.map((device) => (
+                      {roomDevices.map(device => (
                         <DeviceCard
                           key={device.id}
                           device={device}
                           onToggle={handleToggleDevice}
-                          onViewDetails={setSelectedDevice}
+                          onViewDetails={(d) => setSelectedDevice(d)}
                         />
                       ))}
                     </div>
@@ -307,7 +417,6 @@ function DeviceManagementPage() {
         )}
       </div>
 
-      {/* Device Detail Modal */}
       {selectedDevice && (
         <DeviceDetailModal
           device={selectedDevice}

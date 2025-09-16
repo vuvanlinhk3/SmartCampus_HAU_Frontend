@@ -22,7 +22,6 @@ export const ROUTES = {
   HOME: '/',
   FORGOT_PASSWORD: {
     STEP1: '/forgot-password/step1',
-    STEP2: '/forgot-password/step2',
-    STEP3: '/forgot-password/step3'
+    RESET: '/reset-password'
   }
 } as const;

@@ -16,7 +16,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   ];
 
   return (
-    <div className="fixed left-0 top-0 w-64 bg-white shadow-lg h-screen flex flex-col">
+    <div className="fixed left-0 top-0 w-64 bg-white shadow-lg h-screen flex flex-col justify-between">
       {/* Logo Section */}
       <div className="p-4 border-b border-gray-200 h-20">
         <div className="flex items-center space-x-3 h-full">
@@ -51,12 +51,20 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       </nav>
 
       {/* Settings and Account Section */}
-      <div className="p-4">
-        <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-600 hover:text-blue-600 transition-colors mb-3 rounded-lg">
+      <div className="p-4 border-t border-gray-200">
+        {/* Cài đặt */}
+        <button
+          onClick={() => setActiveTab('setting')}
+          className={`w-full flex items-center space-x-3 px-4 py-2 text-sm rounded-lg transition-colors mb-3 ${
+            activeTab === 'setting'
+              ? 'bg-blue-50 text-blue-600'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-blue-600'
+          }`}
+        >
           <Cog className="w-5 h-5" />
           <span>Cài đặt</span>
         </button>
-        <hr className="border-gray-200" />
+
         <div className="flex items-center space-x-3 mt-3">
           <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
             <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
